@@ -18,13 +18,19 @@ namespace miner {
    struct MinerParams {
       // const unsigned fetch_challenge_period = 
       std::chrono::seconds challenge_fetch_period;
-      std::uint8_t num_threads;
+      unsigned num_threads;
       std::string id_of_miner;
 
       void clean();
    };
 
-   void print_digest(std::ostream&, const typename std::span<std::uint8_t>);
+   struct FoundCoin {
+      std::string id_of_miner;
+      CoinBlob coin_blob;
+      Digest digest;
+   };
+
+   void print_hex_bytes(std::ostream&, const typename std::span<const std::uint8_t>);
 
    void mine_coins(MinerParams);
 }

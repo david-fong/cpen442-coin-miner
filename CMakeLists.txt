@@ -14,13 +14,21 @@ set(CMAKE_CXX_EXTENSIONS FALSE)
 if(MSVC)
 	add_compile_options(/W4 /WX)
 else()
-	add_compile_options(-Wall -Wextra -Wpedantic -Werror -Wold-style-cast -Wimplicit-fallthrough=5 -march=native)
+	add_compile_options(
+		-Wall -Wextra -Wpedantic -Werror
+		-Wold-style-cast -Wcast-qual
+		-Wformat=2
+		-Wimplicit-fallthrough=5
+		-Wshadow
+		-march=native
+	)
 endif()
 
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 
 set(OPENSSL_USE_STATIC_LIBS)
 find_package(OpenSSL REQUIRED)
+find_package(Boost REQUIRED)
 
 # https://cliutils.gitlab.io/modern-cmake/chapters/testing.html
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)

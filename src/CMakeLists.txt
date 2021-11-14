@@ -4,3 +4,4 @@ add_executable(miner
    net_api.cpp
 )
 target_link_libraries(miner OpenSSL::SSL)
+target_link_libraries(miner Boost::boost)
