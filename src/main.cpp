@@ -15,19 +15,19 @@
 int main(const int argc, char const *const argv[]) {
 	// My implementation specifies this as safe:
 	std::ios_base::sync_with_stdio(false);
-   if (argc < 4) {
-      std::cerr << "missing args. check main.cpp for args format.";
-      return 1;
-   }
+	if (argc < 4) {
+		std::cerr << "missing args. check main.cpp for args format.";
+		return 1;
+	}
 
-   miner::MinerParams miner_params {
-      .id_of_miner = std::string(argv[1]),
-      .team_member_id = std::string(argv[2]),
-      .last_coin = std::string(argv[3]),
-      .difficulty = static_cast<unsigned>(std::stoi(argv[4])),
-      .num_threads = static_cast<unsigned>(std::stoi(argv[5])),
-   };
-   miner_params.clean();
-   miner::mine_coin(miner_params);
-   return 0;
+	miner::MinerParams miner_params {
+		.id_of_miner = std::string(argv[1]),
+		.team_member_id = std::string(argv[2]),
+		.last_coin = std::string(argv[3]),
+		.difficulty = static_cast<unsigned>(std::stoi(argv[4])),
+		.num_threads = static_cast<unsigned>(std::stoi(argv[5])),
+	};
+	miner_params.clean();
+	miner::mine_coin(miner_params);
+	return 0;
 }
