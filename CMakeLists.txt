@@ -28,7 +28,6 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 
 set(OPENSSL_USE_STATIC_LIBS)
 find_package(OpenSSL REQUIRED)
-find_package(Boost REQUIRED)
 
 # https://cliutils.gitlab.io/modern-cmake/chapters/testing.html
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)

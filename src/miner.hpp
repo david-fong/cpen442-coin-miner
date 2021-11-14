@@ -1,25 +1,33 @@
 #ifndef HPP_MINER
 #define HPP_MINER
 
+#include <openssl/sha.h>
 #include <iosfwd>
 #include <string>
 #include <array>
-#include <chrono>
 #include <span>
 #include <cstdint>
-#include <openssl/sha.h>
 
 namespace miner {
+
+   const struct {
+      std::string wallet_dir = "wallet/";
+      std::string coins_file = "coins.txt";
+      std::string last_coin_found_hash_file = "last_coin_found_hash.txt";
+   } PATH;
+
    const std::string CHALLENGE_PREFIX = "CPEN 442 Coin2021";
+   const unsigned TEAM_MEMBER_ID_BYTES = 7; // chosen to fit all our first names
    constexpr size_t COIN_BLOB_BYTES = 38;
    using CoinBlob = std::array<std::uint8_t, COIN_BLOB_BYTES>;
    using Digest = std::array<std::uint8_t, SHA256_DIGEST_LENGTH>;
 
    struct MinerParams {
-      // const unsigned fetch_challenge_period = 
-      std::chrono::seconds challenge_fetch_period;
-      unsigned num_threads;
       std::string id_of_miner;
+      std::string team_member_id;
+      std::string last_coin;
+      unsigned difficulty;
+      unsigned num_threads;
 
       void clean();
    };
@@ -32,6 +40,8 @@ namespace miner {
 
    void print_hex_bytes(std::ostream&, const typename std::span<const std::uint8_t>);
 
-   void mine_coins(MinerParams);
+   void mine_coin(MinerParams);
+
+   void claim_coin(const FoundCoin&);
 }
 #endif
