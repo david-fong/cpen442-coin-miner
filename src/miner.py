@@ -32,7 +32,8 @@ def start_mining(params: MinerParams):
 		)
 		while True:
 			try:
-				stdout, = miners_proc.communicate(timeout=(60/10)+1)
+				stdout, stderr = miners_proc.communicate(timeout=(60/10)+1)
+				# print(stderr)
 				bonk.claim_coin(id_of_miner=params.id_of_miner, coin_blob=stdout)
 				challenge = bonk.fetch_challenge(challenge)
 				break
