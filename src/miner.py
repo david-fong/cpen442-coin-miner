@@ -43,6 +43,10 @@ def start_mining(params: MinerParams):
 					challenge = new_challenge
 					break
 				# else continue polling for miners_proc finish
+			except (KeyboardInterrupt, Exception):
+				# catch-all clause to kill the miner program
+				miners_proc.kill()
+				raise
 
 
 def main() -> int:
