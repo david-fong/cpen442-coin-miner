@@ -74,12 +74,12 @@ namespace miner {
 			permute_coin_blob_();
 
 			// periodically print the coin_blob for debugging purposes:
-			if (check_success_(6, coin_blob_)) [[unlikely]] {
+			/* if (check_success_(6, coin_blob_)) [[unlikely]] {
 				const std::lock_guard mutex_guard(share.mutex);
 				if (share.stop) { return; }
 				std::clog << "\nthread " << params.thread_num << " progress: ";
 				print_hex_bytes(std::clog, coin_blob_);
-			}
+			} */
 		}
 	}
 
@@ -154,20 +154,21 @@ namespace miner {
 
 
 	void claim_coin(const FoundCoin& found) {
-		std::cout << '\n';
-		std::cout << "\nid_of_miner: " << found.id_of_miner;
-		std::cout << "\ncoin_blob: "; print_hex_bytes(std::cout, found.coin_blob);
-		std::cout << "\ndigest: "; print_hex_bytes(std::cout, found.digest);
-		std::stringstream coin_blob_ss;
-		print_hex_bytes(coin_blob_ss, found.coin_blob);
-		const std::string coin_blob_str = coin_blob_ss.str();
 		{
+			std::ostream& os = std::clog;
+			os << '\n';
+			os << "\nid_of_miner: " << found.id_of_miner;
+			os << "\ncoin_blob: "; print_hex_bytes(os, found.coin_blob);
+			os << "\ndigest: "; print_hex_bytes(os, found.digest);
+		} {
 			std::ofstream file(PATH.wallet_dir + PATH.coins_file, std::fstream::app);
-			file << '\n' << coin_blob_str;
+			file << '\n';
+			print_hex_bytes(file, found.coin_blob);
 		} {
 			std::ofstream file(PATH.wallet_dir + PATH.last_coin_found_hash_file, std::fstream::trunc);
 			print_hex_bytes(file, found.digest);
 		}
-		std::cout << '\a' << std::flush;
+		print_hex_bytes(std::cout, found.coin_blob);
+		std::clog << '\a' << std::flush;
 	}
 }
