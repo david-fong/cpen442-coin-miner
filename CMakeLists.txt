@@ -26,6 +26,7 @@ endif()
 
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 
+find_package(Threads REQUIRED)
 set(OPENSSL_USE_STATIC_LIBS)
 find_package(OpenSSL REQUIRED)
 
