@@ -34,8 +34,6 @@ class Bank:
 		res = conn.getresponse()
 		j = json.loads(res.read())
 		new_last_coin = j["coin_id"]
-		if prev_fetched and new_last_coin == prev_fetched.last_coin:
-			return prev_fetched
 
 		conn.request("POST", "/difficulty", headers=self.common_headers)
 		res = conn.getresponse()
