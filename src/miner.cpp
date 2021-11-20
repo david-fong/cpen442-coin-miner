@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <thread>
 #include <mutex>
+#include <vector>
 #include <algorithm>
 
 namespace miner {
@@ -44,7 +45,7 @@ namespace miner {
 
 		void operator()();
 		CoinBlob coin_blob_ = {0};
-		static bool check_success_(std::uint8_t difficulty, std::span<std::uint8_t>);
+		static bool check_success_(unsigned difficulty, std::span<std::uint8_t>);
 		void permute_coin_blob_();
 	};
 
@@ -53,7 +54,9 @@ namespace miner {
 		for (unsigned i = 0; i < std::min(TEAM_MEMBER_ID_BYTES, params.team_member_id.size()); i++) {
 			coin_blob_[COIN_BLOB_TEAM_MEMBER_ID_OFFSET+i] = params.team_member_id[i];
 		}
-		coin_blob_[COIN_BLOB_TEAM_MEMBER_ID_OFFSET-1] = (0x100u * params.thread_num) / params.num_threads;
+		coin_blob_[COIN_BLOB_TEAM_MEMBER_ID_OFFSET-1] = static_cast<std::uint8_t>(
+			(0x100u * params.thread_num) / params.num_threads
+		);
 		while (!share.stop) {
 			SHA256_CTX hasher = params.hasher_prefix;
 			SHA256_Update(&hasher, coin_blob_.data(), coin_blob_.size());
@@ -84,7 +87,7 @@ namespace miner {
 	}
 
 
-	bool ThreadFunc::check_success_(const std::uint8_t difficulty, const std::span<std::uint8_t> data) {
+	bool ThreadFunc::check_success_(const unsigned difficulty, const std::span<std::uint8_t> data) {
 		for (unsigned i = 0; i < difficulty/2; i++) {
 			if (data[i]) [[likely]] { return false; }
 		}
@@ -125,14 +128,14 @@ namespace miner {
 			os << "\ndifficulty: " << params.difficulty;
 			os.flush();
 		}
-	
+
 		SHA256_CTX hasher_prefix;
 		SHA256_Init(&hasher_prefix);
 		SHA256_Update(&hasher_prefix, CHALLENGE_PREFIX.data(), CHALLENGE_PREFIX.size());
 		SHA256_Update(&hasher_prefix, params.last_coin.data(), params.last_coin.size());
 
 		MinerThreadsSharedData threads_shared_data;
-		std::vector<std::thread> threads;
+		typename std::vector<std::thread> threads;
 		for (std::uint8_t i = 0; i < params.num_threads; i++) {
 			threads.push_back(std::thread(ThreadFunc{
 				.params {

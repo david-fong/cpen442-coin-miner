@@ -10,6 +10,7 @@
 		// "${workspaceFolder}/include",
 		"${workspaceFolder}/src"
 	],
+	"files.trimTrailingWhitespace": true,
 	"[cpp]": {
 		"editor.insertSpaces": false
 	},

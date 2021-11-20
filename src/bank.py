@@ -43,9 +43,10 @@ class Bank:
 		return ChallengeParams(new_last_coin, j["number_of_leading_zeros"]) # *sad american spelling noises
 
 
-	def claim_coin(self, id_of_miner, coin_blob_str):
+	def claim_coin(self, id_of_miner: str, coin_blob_str: str):
+		print(base64.b64encode(bytes.fromhex(coin_blob_str)))
 		req_body = json.dumps({
-			"coin_blob": base64.b64encode(bytes.fromhex(coin_blob_str)),
+			"coin_blob": str(base64.b64encode(bytes.fromhex(coin_blob_str)), "ascii"),
 			"id_of_miner": id_of_miner,
 		})
 		conn = http.client.HTTPConnection(self.url)

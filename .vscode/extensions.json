@@ -2,6 +2,6 @@
    "recommendations": [
       "ms-vscode.cpptools",
       "twxs.cmake",
-      "ms-python.vscode-pylance"
+      "ms-python.python"
    ]
 }

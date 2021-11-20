@@ -1,6 +1,7 @@
 import subprocess
 import os
 import sys
+import platform
 
 import bank
 
@@ -19,11 +20,16 @@ class MinerParams:
 
 
 def start_mining(params: MinerParams):
+	miner_exe = {
+		"Linux":   os.path.join(os.getcwd(), "build", "src", "miner"),
+		"Windows": os.path.join(os.getcwd(), "build", "src", "Release", "miner.exe"),
+	}[platform.system()]
+	print(miner_exe)
 	bonk = bank.Bank(params.bank_url)
 	challenge = bonk.fetch_challenge(None)
 	while True:
 		miners_proc = subprocess.Popen(
-			[os.path.join(os.getcwd(), "build", "src", "miner"),
+			[miner_exe,
 			params.id_of_miner, params.team_member_id,
 			challenge.last_coin, str(challenge.difficulty),
 			str(params.num_threads)],
@@ -34,7 +40,8 @@ def start_mining(params: MinerParams):
 			try:
 				stdout, stderr = miners_proc.communicate(timeout=(60/10)+1)
 				# print(stderr)
-				bonk.claim_coin(id_of_miner=params.id_of_miner, coin_blob=stdout)
+				bonk.claim_coin(id_of_miner=params.id_of_miner, coin_blob_str=stdout)
+				print("🎊 claimed a coin\n")
 				challenge = bonk.fetch_challenge(challenge)
 				break
 			except subprocess.TimeoutExpired:
