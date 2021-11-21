@@ -24,11 +24,12 @@ Note: This assumes that you are setting up WSL for the first time.
 ```
 sudo apt install cmake
 sudo apt install make
+sudo apt-get install libssl-dev
 sudo add-apt-repository ppa:ubuntu-toolchain-r/test
 sudo apt-get update
 sudo apt install g++-11
 export CC=/usr/bin/gcc-11
-export CXX/usr/bin/g++-11
+export CXX=/usr/bin/g++-11
 ```
 
 - [in wsl, create an ssh key for git](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account)
