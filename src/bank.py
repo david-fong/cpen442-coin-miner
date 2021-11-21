@@ -27,7 +27,7 @@ class Bank:
 		self.url = url
 
 
-	def fetch_challenge(self, prev_fetched: ChallengeParams or None) -> ChallengeParams:
+	def fetch_challenge(self) -> ChallengeParams:
 		conn = http.client.HTTPConnection(self.url)
 
 		conn.request("POST", "/last_coin", headers=self.common_headers)

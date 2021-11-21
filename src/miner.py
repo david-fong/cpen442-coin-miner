@@ -45,8 +45,8 @@ def start_mining(params: MinerParams):
 				challenge = bonk.fetch_challenge(challenge)
 				break
 			except subprocess.TimeoutExpired:
-				new_challenge = bonk.fetch_challenge(challenge)
-				if new_challenge.last_coin != challenge.last_coin:
+				new_challenge = bonk.fetch_challenge()
+				if new_challenge.last_coin != challenge.last_coin or new_challenge.difficulty != challenge.difficulty:
 					miners_proc.kill()
 					challenge = new_challenge
 					break
