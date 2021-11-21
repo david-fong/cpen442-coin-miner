@@ -26,7 +26,7 @@ def start_mining(params: MinerParams):
 	}[platform.system()]
 	print(miner_exe)
 	bonk = bank.Bank(params.bank_url)
-	challenge = bonk.fetch_challenge(None)
+	challenge = bonk.fetch_challenge()
 	while True:
 		miners_proc = subprocess.Popen(
 			[miner_exe,
@@ -42,7 +42,7 @@ def start_mining(params: MinerParams):
 				# print(stderr)
 				bonk.claim_coin(id_of_miner=params.id_of_miner, coin_blob_str=stdout)
 				print("🎊 claimed a coin\n")
-				challenge = bonk.fetch_challenge(challenge)
+				challenge = bonk.fetch_challenge()
 				break
 			except subprocess.TimeoutExpired:
 				new_challenge = bonk.fetch_challenge()
