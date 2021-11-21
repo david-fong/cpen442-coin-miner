@@ -24,6 +24,7 @@ Note: This assumes that you are setting up WSL for the first time.
 ```
 sudo apt install cmake
 sudo apt install make
+sudo apt-get install libssl-dev
 sudo add-apt-repository ppa:ubuntu-toolchain-r/test
 sudo apt-get update
 sudo apt install g++-11
