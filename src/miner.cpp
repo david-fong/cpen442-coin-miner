@@ -139,12 +139,12 @@ namespace miner {
 		for (std::uint8_t i = 0; i < params.num_threads; i++) {
 			threads.push_back(std::thread(ThreadFunc{
 				.params {
-					.difficulty {params.difficulty},
+					.difficulty = params.difficulty,
 					.hasher_prefix {hasher_prefix},
 					.id_of_miner {params.id_of_miner},
 					.team_member_id {params.team_member_id},
-					.thread_num {i},
-					.num_threads {params.num_threads}
+					.thread_num = i,
+					.num_threads = params.num_threads
 				},
 				.share {threads_shared_data},
 			}));

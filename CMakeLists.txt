@@ -15,10 +15,10 @@ if(MSVC)
 	add_compile_options(/W4 /WX)
 else()
 	add_compile_options(
-		-Wall -Wextra -Wpedantic -Werror
+		-Wall -Wextra -Wpedantic #-Werror
 		-Wold-style-cast -Wcast-qual
 		-Wformat=2
-		-Wimplicit-fallthrough=5
+		-Wimplicit-fallthrough #=5 apple clang rejects this :/
 		-Wshadow
 		-march=native
 	)

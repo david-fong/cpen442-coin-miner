@@ -22,6 +22,7 @@ class MinerParams:
 def start_mining(params: MinerParams):
 	miner_exe = {
 		"Linux":   os.path.join(os.getcwd(), "build", "src", "miner"),
+		"Darwin":  os.path.join(os.getcwd(), "build", "src", "miner"),
 		"Windows": os.path.join(os.getcwd(), "build", "src", "Release", "miner.exe"),
 	}[platform.system()]
 	print(miner_exe)
