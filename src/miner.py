@@ -2,8 +2,12 @@ import subprocess
 import os
 import sys
 import platform
+import time
 
 import bank
+
+
+POLLING_PERIOD_SECONDS = (60/10)+1
 
 
 class MinerParams:
@@ -28,6 +32,9 @@ def start_mining(params: MinerParams):
 	print(miner_exe)
 	bonk = bank.Bank(params.bank_url)
 	challenge = bonk.fetch_challenge()
+	while challenge == None:
+		time.sleep(POLLING_PERIOD_SECONDS)
+		challenge = bonk.fetch_challenge()
 	while True:
 		miners_proc = subprocess.Popen(
 			[miner_exe,
@@ -39,17 +46,20 @@ def start_mining(params: MinerParams):
 		)
 		while True:
 			try:
-				stdout, stderr = miners_proc.communicate(timeout=(60/10)+1)
+				stdout, stderr = miners_proc.communicate(timeout=POLLING_PERIOD_SECONDS)
 				# print(stderr)
 				bonk.claim_coin(id_of_miner=params.id_of_miner, coin_blob_str=stdout)
 				print("🎊 claimed a coin\n")
 				challenge = bonk.fetch_challenge()
+				while challenge == None:
+					time.sleep(POLLING_PERIOD_SECONDS)
+					challenge = bonk.fetch_challenge()
 				break
 			except subprocess.TimeoutExpired:
-				new_challenge = bonk.fetch_challenge()
-				if new_challenge.last_coin != challenge.last_coin or new_challenge.difficulty != challenge.difficulty:
+				new_chl = bonk.fetch_challenge()
+				if new_chl != None and new_chl.last_coin != challenge.last_coin or new_chl.difficulty != challenge.difficulty:
 					miners_proc.kill()
-					challenge = new_challenge
+					challenge = new_chl
 					break
 				# else continue polling for miners_proc finish
 			except (KeyboardInterrupt, Exception):

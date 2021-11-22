@@ -28,25 +28,37 @@ class Bank:
 
 
 	def fetch_challenge(self) -> ChallengeParams:
-		conn = http.client.HTTPConnection(self.url)
+		"""Returns None if the http request failed"""
+		try:
+			conn = http.client.HTTPConnection(self.url)
 
-		conn.request("POST", "/last_coin", headers=self.common_headers)
-		res = conn.getresponse()
-		j = json.loads(res.read())
-		new_last_coin = j["coin_id"]
+			conn.request("POST", "/last_coin", headers=self.common_headers)
+			res = conn.getresponse()
+			j = json.loads(res.read())
+			new_last_coin = j["coin_id"]
 
-		conn.request("POST", "/difficulty", headers=self.common_headers)
-		res = conn.getresponse()
-		j = json.loads(res.read())
-		return ChallengeParams(new_last_coin, j["number_of_leading_zeros"]) # *sad american spelling noises
+			conn.request("POST", "/difficulty", headers=self.common_headers)
+			res = conn.getresponse()
+			j = json.loads(res.read())
+			return ChallengeParams(new_last_coin, j["number_of_leading_zeros"]) # *sad american spelling noises
+
+		except Exception as err:
+			print(err)
+			return None
 
 
 	def claim_coin(self, id_of_miner: str, coin_blob_str: str):
-		print(base64.b64encode(bytes.fromhex(coin_blob_str)))
-		req_body = json.dumps({
-			"coin_blob": str(base64.b64encode(bytes.fromhex(coin_blob_str)), "ascii"),
-			"id_of_miner": id_of_miner,
-		})
-		conn = http.client.HTTPConnection(self.url)
-		conn.request("POST", "/claim_coin", headers=self.common_headers, body=req_body)
-		res = conn.getresponse()
+		coin_blob_str_base64 = str(base64.b64encode(bytes.fromhex(coin_blob_str)), "ascii")
+		try:
+			req_body = json.dumps({
+				"coin_blob": coin_blob_str_base64,
+				"id_of_miner": id_of_miner,
+			})
+			conn = http.client.HTTPConnection(self.url)
+			conn.request("POST", "/claim_coin", headers=self.common_headers, body=req_body)
+			res = conn.getresponse()
+
+		except Exception as err:
+			print(err)
+			print("🚨 http request to claim coin failed! please claim it manually")
+			print("coin_blob base64: " + coin_blob_str_base64 + "\n")

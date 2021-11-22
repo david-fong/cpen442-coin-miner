@@ -12,6 +12,7 @@ cmake --build build --config Release
 # note: do this again every time the c++ files are changed
 
 # run the miner:
+# since the miner increments a counter as its input, the your_first_name_here argument is used to make sure group members aren't mining for the same inputs. If you are mining with multiple computers, use a slightly different value for each computer. Ex. "david0", "david1".
 python3 src/miner.py 96c3dfa5a7e119a8786e0b2c6dd332cf7302248611a1c37ffc6c2727e3a295b7 your_first_name_here num_threads
 ```
 
