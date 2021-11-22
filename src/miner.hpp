@@ -15,6 +15,11 @@ namespace miner {
 		std::string coins_file = "coins.txt";
 		std::string last_coin_found_hash_file = "last_coin_found_hash.txt";
 		std::string seed_file = "seed.txt";
+
+		// Contents are not automatically cleared upon termination since
+		// termination may also be for downtime and not for claiming a coin.
+		// Clearing must be done externally (Ie. by the python script).
+		std::string difficulty_drop_cache_file = "difficulty_drop_cache.txt";
 	} PATH;
 
 	const std::string CHALLENGE_PREFIX = "CPEN 442 Coin2021";
@@ -23,6 +28,13 @@ namespace miner {
 	constexpr size_t COIN_BLOB_TEAM_MEMBER_ID_OFFSET = COIN_BLOB_BYTES-TEAM_MEMBER_ID_BYTES;
 	using CoinBlob = std::array<std::uint8_t, COIN_BLOB_BYTES>;
 	using Digest = std::array<std::uint8_t, SHA256_DIGEST_LENGTH>;
+
+	namespace difficulty {
+		constexpr unsigned MIN_DIFFICULTY = 7;
+		extern unsigned drop_cache_difficulty;
+
+		void init_drop_cache(void);
+	}
 
 	struct MinerParams {
 		std::string id_of_miner;

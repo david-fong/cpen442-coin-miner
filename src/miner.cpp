@@ -1,5 +1,6 @@
 #include "miner.hpp"
 
+#include <filesystem>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -11,11 +12,21 @@
 
 namespace miner {
 
-	void print_hex_bytes(std::ostream& os, const std::span<const std::uint8_t> digest) {
+	namespace difficulty {
+		unsigned drop_cache_difficulty = MIN_DIFFICULTY - 1;
+		void init_drop_cache(void) {
+			if (std::filesystem::exists(PATH.wallet_dir + PATH.difficulty_drop_cache_file)) {
+				std::ifstream file(PATH.wallet_dir + PATH.difficulty_drop_cache_file);
+				file >> drop_cache_difficulty;
+			}
+		}
+	}
+
+	void print_hex_bytes(std::ostream& os, const std::span<const std::uint8_t> bytes) {
 		const auto old_fmt = os.flags();
 		os << std::hex << std::setfill('0');
-		for (unsigned i = 0; i < digest.size(); i++) {
-			os << std::setw(2) << static_cast<unsigned>(digest[i]);
+		for (unsigned i = 0; i < bytes.size(); i++) {
+			os << std::setw(2) << static_cast<unsigned>(bytes[i]);
 		}
 		os << std::flush;
 		os.setf(old_fmt);
@@ -46,7 +57,7 @@ namespace miner {
 
 		void operator()();
 		CoinBlob coin_blob_ = {0};
-		static bool check_success_(unsigned difficulty, std::span<std::uint8_t>);
+		static unsigned count_leading_zero_nibbles_(unsigned difficulty, std::span<std::uint8_t>);
 		void permute_coin_blob_();
 	};
 
@@ -66,7 +77,8 @@ namespace miner {
 			Digest md;
 			SHA256_Final(md.data(), &hasher);
 			if (share.stop) { return; }
-			if (check_success_(params.difficulty, md)) [[unlikely]] {
+			const unsigned found_difficulty = count_leading_zero_nibbles_(params.difficulty, md);
+			if (found_difficulty >= params.difficulty) [[unlikely]] {
 				const std::lock_guard mutex_guard(share.mutex);
 				share.found_coin = FoundCoin {
 					.id_of_miner {params.id_of_miner},
@@ -75,11 +87,18 @@ namespace miner {
 				};
 				share.stop = true;
 				return;
+
+			} else if (found_difficulty > difficulty::drop_cache_difficulty) [[unlikely]] {
+				const std::lock_guard mutex_guard(share.mutex);
+				difficulty::drop_cache_difficulty = found_difficulty;
+				std::ofstream file(PATH.wallet_dir + PATH.difficulty_drop_cache_file, std::fstream::trunc);
+				file << found_difficulty << ' ';
+				print_hex_bytes(file, coin_blob_);
 			}
 			permute_coin_blob_();
 
 			// periodically print the coin_blob for debugging purposes:
-			/* if (check_success_(6, coin_blob_)) [[unlikely]] {
+			/* if (count_leading_zero_nibbles_(6, coin_blob_) >= 6) [[unlikely]] {
 				const std::lock_guard mutex_guard(share.mutex);
 				if (share.stop) { return; }
 				std::clog << "\nthread " << params.thread_num << " progress: ";
@@ -89,12 +108,18 @@ namespace miner {
 	}
 
 
-	bool ThreadFunc::check_success_(const unsigned difficulty, const std::span<std::uint8_t> data) {
-		for (unsigned i = 0; i < difficulty/2; i++) {
-			if (data[i]) [[likely]] { return false; }
+	unsigned ThreadFunc::count_leading_zero_nibbles_(const unsigned difficulty, const std::span<std::uint8_t> data) {
+		unsigned count = 0;
+		unsigned i = 0;
+		for (; i < difficulty/2; i++) {
+			if (data[i]) [[likely]] {
+				if (!(data[i] & 0xf0)) [[likely]] { count += 1; }
+				return count;
+			}
+			else { count += 2; }
 		}
-		if ((difficulty%2) && (data[difficulty/2] & 0xf0)) [[likely]] { return false; }
-		return true;
+		if (!(data[i] & 0xf0)) [[likely]] { count += 1; }
+		return count;
 	}
 
 
