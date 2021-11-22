@@ -14,6 +14,7 @@ namespace miner {
 		std::string wallet_dir = "wallet/";
 		std::string coins_file = "coins.txt";
 		std::string last_coin_found_hash_file = "last_coin_found_hash.txt";
+		std::string seed_file = "seed.txt";
 	} PATH;
 
 	const std::string CHALLENGE_PREFIX = "CPEN 442 Coin2021";

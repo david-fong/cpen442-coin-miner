@@ -27,6 +27,7 @@ namespace miner {
 		const SHA256_CTX& hasher_prefix;
 		std::string id_of_miner; // oof. wish this wasn't a hex string.
 		std::string team_member_id;
+		std::uint8_t seed;
 		unsigned thread_num;
 		unsigned num_threads;
 	};
@@ -54,7 +55,8 @@ namespace miner {
 		for (unsigned i = 0; i < std::min(TEAM_MEMBER_ID_BYTES, params.team_member_id.size()); i++) {
 			coin_blob_[COIN_BLOB_TEAM_MEMBER_ID_OFFSET+i] = params.team_member_id[i];
 		}
-		coin_blob_[COIN_BLOB_TEAM_MEMBER_ID_OFFSET-1] = static_cast<std::uint8_t>(
+		coin_blob_[COIN_BLOB_TEAM_MEMBER_ID_OFFSET-1] = params.seed;
+		coin_blob_[COIN_BLOB_TEAM_MEMBER_ID_OFFSET-2] = static_cast<std::uint8_t>(
 			(0x100u * params.thread_num) / params.num_threads
 		);
 		while (!share.stop) {
@@ -98,7 +100,7 @@ namespace miner {
 
 	void ThreadFunc::permute_coin_blob_() {
 		for (unsigned i = 0; i < COIN_BLOB_TEAM_MEMBER_ID_OFFSET; i++) {
-			if (i == COIN_BLOB_TEAM_MEMBER_ID_OFFSET) [[unlikely]] {
+			if (i == COIN_BLOB_TEAM_MEMBER_ID_OFFSET-1) [[unlikely]] {
 				// TODO handle endpoint for this thread based on thread_num and num_threads
 				// well... it's almost astronomically unlikely that the permutation will
 				// reach this point...
@@ -122,11 +124,23 @@ namespace miner {
 	void mine_coin(const MinerParams params) {
 		{
 			std::ostream& os = std::clog;
-			os << "\nid_of_miner: " << params.id_of_miner;
+			// os << "\nid_of_miner: " << params.id_of_miner;
 			os << "\nteam_member_id: " << params.team_member_id;
 			os << "\nlast_coin: " << params.last_coin;
 			os << "\ndifficulty: " << params.difficulty;
-			os.flush();
+			os << std::endl;
+		}
+		// a naive seed for handling restarts since the coin_blob is a counter:
+		std::uint8_t seed; {
+			std::ifstream file(PATH.wallet_dir + PATH.seed_file);
+			if (file.fail()) {
+				seed = 0;
+			} else {
+				file >> seed;
+			}
+		} {
+			std::ofstream file(PATH.wallet_dir + PATH.seed_file, std::fstream::trunc);
+			file << static_cast<std::uint8_t>(seed + 1);
 		}
 
 		SHA256_CTX hasher_prefix;
@@ -143,6 +157,7 @@ namespace miner {
 					.hasher_prefix {hasher_prefix},
 					.id_of_miner {params.id_of_miner},
 					.team_member_id {params.team_member_id},
+					.seed = seed,
 					.thread_num = i,
 					.num_threads = params.num_threads
 				},
