@@ -3,7 +3,6 @@
 #include <filesystem>
 #include <iostream>
 #include <fstream>
-#include <sstream>
 #include <iomanip>
 #include <thread>
 #include <mutex>
@@ -147,6 +146,7 @@ namespace miner {
 
 
 	void mine_coin(const MinerParams params) {
+		difficulty::init_drop_cache();
 		{
 			std::ostream& os = std::clog;
 			// os << "\nid_of_miner: " << params.id_of_miner;
