@@ -1,6 +1,10 @@
+import time
 import http.client
 import json
 import base64
+
+
+POLLING_PERIOD_SECONDS = (60/10)+1
 
 
 class ChallengeParams:
@@ -27,7 +31,7 @@ class Bank:
 		self.url = url
 
 
-	def fetch_challenge(self) -> ChallengeParams:
+	def _fetch_challenge(self) -> ChallengeParams or None:
 		"""Returns None if the http request failed"""
 		try:
 			conn = http.client.HTTPConnection(self.url)
@@ -45,6 +49,15 @@ class Bank:
 		except Exception as err:
 			print(err)
 			return None
+
+
+	def fetch_challenge(self) -> ChallengeParams:
+		"""Polls according to POLLING_PERIOD_SECONDS upon failed http requests."""
+		challenge = self._fetch_challenge()
+		while challenge == None:
+			time.sleep(POLLING_PERIOD_SECONDS)
+			challenge = self._fetch_challenge()
+		return challenge
 
 
 	def claim_coin(self, id_of_miner: str, coin_blob_str: str):

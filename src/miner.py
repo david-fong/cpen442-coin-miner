@@ -2,12 +2,8 @@ import subprocess
 import os
 import sys
 import platform
-import time
 
 import bank
-
-
-POLLING_PERIOD_SECONDS = (60/10)+1
 
 
 class MinerParams:
@@ -23,18 +19,11 @@ class MinerParams:
 		self.num_threads = num_threads
 
 
-def setup_new_mine(bonk: bank.Bank, clear_drop_cache=True) -> bank.ChallengeParams:
-	if clear_drop_cache:
-		try:
-			os.remove(os.path.join(os.getcwd(), "wallet", "difficulty_drop_cache.txt"))
-		except:
-			pass
-
-	challenge = bonk.fetch_challenge()
-	while challenge == None:
-		time.sleep(POLLING_PERIOD_SECONDS)
-		challenge = bonk.fetch_challenge()
-	return challenge
+def clear_drop_cache():
+	try:
+		os.remove(os.path.join(os.getcwd(), "wallet", "difficulty_drop_cache.txt"))
+	except:
+		pass
 
 
 def start_mining(params: MinerParams):
@@ -46,7 +35,7 @@ def start_mining(params: MinerParams):
 	print(miner_exe)
 	bonk = bank.Bank(params.bank_url)
 
-	challenge = setup_new_mine(bonk, clear_drop_cache=False)
+	challenge = bonk.fetch_challenge()
 	while True:
 		miners_proc = subprocess.Popen(
 			[miner_exe,
@@ -58,11 +47,12 @@ def start_mining(params: MinerParams):
 		)
 		while True:
 			try:
-				stdout, stderr = miners_proc.communicate(timeout=POLLING_PERIOD_SECONDS)
+				stdout, stderr = miners_proc.communicate(timeout=bank.POLLING_PERIOD_SECONDS)
 				# print(stderr)
-				print("🎊 found a coin!\n")
 				bonk.claim_coin(id_of_miner=params.id_of_miner, coin_blob_str=stdout)
-				challenge = setup_new_mine(bonk)
+				print("🎊 found a coin!\n")
+				clear_drop_cache()
+				challenge = bonk.fetch_challenge()
 				break
 			except subprocess.TimeoutExpired:
 				new_chl = bonk.fetch_challenge()
@@ -77,15 +67,18 @@ def start_mining(params: MinerParams):
 								with open(cache_path, mode="r") as cache:
 									cache_difficulty, coin_blob_str = str.split(cache.readline())
 									if (int(cache_difficulty) >= new_chl.difficulty):
-										print("🎊 found a difficulty_drop_cache coin!\n")
 										bonk.claim_coin(id_of_miner=params.id_of_miner, coin_blob_str=coin_blob_str)
-										challenge = setup_new_mine(bonk)
+										print("🎊 found a difficulty_drop_cache coin!\n") # TODO only print if API returns OK
+										# TODO add this to wallet/coins.txt, since the C++ code doesn't do it.
+										clear_drop_cache()
+										challenge = bonk.fetch_challenge()
 										break
 							except Exception as err:
 								print("error reading difficulty_drop_cache:\n" + err)
 
 					if is_new_last_coin or is_new_difficulty:
 						miners_proc.kill()
+						clear_drop_cache()
 						challenge = new_chl
 						break
 				# else continue polling for miners_proc finish
