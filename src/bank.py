@@ -33,6 +33,7 @@ class Bank:
 
 	def _fetch_challenge(self) -> ChallengeParams or None:
 		"""Returns None if the http request failed"""
+		ret = None
 		try:
 			conn = http.client.HTTPConnection(self.url)
 
@@ -44,11 +45,14 @@ class Bank:
 			conn.request("POST", "/difficulty", headers=self.common_headers)
 			res = conn.getresponse()
 			j = json.loads(res.read())
-			return ChallengeParams(new_last_coin, j["number_of_leading_zeros"]) # *sad american spelling noises
+			ret = ChallengeParams(new_last_coin, j["number_of_leading_zeros"]) # *sad american spelling noises
 
+		except KeyboardInterrupt as err:
+			raise err
 		except Exception as err:
 			print(err)
-			return None
+		finally:
+			return ret
 
 
 	def fetch_challenge(self) -> ChallengeParams:
@@ -71,6 +75,8 @@ class Bank:
 			conn.request("POST", "/claim_coin", headers=self.common_headers, body=req_body)
 			res = conn.getresponse()
 
+		except KeyboardInterrupt as err:
+			raise err
 		except Exception as err:
 			print(err)
 			print("🚨 http request to claim coin failed! please claim it manually")

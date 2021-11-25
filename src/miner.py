@@ -73,6 +73,8 @@ def start_mining(params: MinerParams):
 										clear_drop_cache()
 										challenge = bonk.fetch_challenge()
 										break
+							except KeyboardInterrupt as err:
+								raise err
 							except Exception as err:
 								print("error reading difficulty_drop_cache:\n" + err)
 
