@@ -56,7 +56,7 @@ namespace miner {
 
 		void operator()();
 		CoinBlob coin_blob_ = {0};
-		static unsigned count_leading_zero_nibbles_(unsigned difficulty, std::span<std::uint8_t>);
+		static unsigned count_leading_zero_nibbles_(unsigned difficulty, std::span<const std::uint8_t>);
 		void permute_coin_blob_();
 	};
 
@@ -107,7 +107,7 @@ namespace miner {
 	}
 
 
-	unsigned ThreadFunc::count_leading_zero_nibbles_(const unsigned difficulty, const std::span<std::uint8_t> data) {
+	unsigned ThreadFunc::count_leading_zero_nibbles_(const unsigned difficulty, const std::span<const std::uint8_t> data) {
 		unsigned count = 0;
 		unsigned i = 0;
 		for (; i < difficulty/2; i++) {

@@ -48,11 +48,13 @@ def start_mining(params: MinerParams):
 		while True:
 			try:
 				stdout, stderr = miners_proc.communicate(timeout=bank.POLLING_PERIOD_SECONDS)
-				# print(stderr)
-				bonk.claim_coin(id_of_miner=params.id_of_miner, coin_blob_str=stdout)
-				print("🎊 found a coin!\n")
-				clear_drop_cache()
-				challenge = bonk.fetch_challenge()
+				if miners_proc.returncode:
+					print(stderr)
+				else:
+					bonk.claim_coin(id_of_miner=params.id_of_miner, coin_blob_str=stdout)
+					print("🎊 found a coin!\n")
+					clear_drop_cache()
+					challenge = bonk.fetch_challenge()
 				break
 			except subprocess.TimeoutExpired:
 				new_chl = bonk.fetch_challenge()

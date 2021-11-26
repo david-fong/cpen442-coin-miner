@@ -78,6 +78,7 @@
 		"*.ipp": "cpp",
 		"cstring": "cpp",
 		"fstream": "cpp",
-		"codecvt": "cpp"
+		"codecvt": "cpp",
+		"map": "cpp"
 	},
 }
