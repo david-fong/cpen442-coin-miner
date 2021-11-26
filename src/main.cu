@@ -23,7 +23,7 @@
 static size_t difficulty = 1;
 
 // Output string by the device read by host
-uint8_t* g_out = nullptr;
+uint8_t* g_nonce_out = nullptr;
 uint8_t* g_hash_out = nullptr;
 int* g_found = nullptr;
 
@@ -35,12 +35,12 @@ static uint64_t last_nonce_since_update = 0;
 static std::chrono::high_resolution_clock::time_point t_last_updated;
 
 
-void print_hash(const uint8_t* sha256) {
-	std::cout << std::hex << std::setfill('0');
-	for (uint8_t i = 0; i < 32; ++i) {
-		std::cout << std::setw(2) << static_cast<int>(sha256[i]);
+void print_hex_bytes(std::ostream& os, const uint8_t* bytes, size_t bytes_size) {
+	os << std::hex << std::setfill('0');
+	for (uint8_t i = 0; i < bytes_size; ++i) {
+		os << std::setw(2) << static_cast<int>(bytes[i]);
 	}
-	std::cout << std::dec << std::endl;
+	os << std::dec << std::endl;
 }
 
 
@@ -59,73 +59,54 @@ __device__ uint8_t count_leading_zero_nibbles_(const uint8_t* const data, const 
 }
 
 
-__device__ uint8_t nonce_to_str(uint64_t nonce, unsigned char* out) {
-	uint64_t result = nonce;
-	uint8_t remainder;
-	uint8_t nonce_size = nonce == 0 ? 1 : floor(log10((double)nonce)) + 1;
-	uint8_t i = nonce_size;
-	while (result >= 10) {
-		remainder = result % 10;
-		result /= 10;
-		out[--i] = remainder + '0';
+__device__ uint8_t nonce_to_bytes(uint64_t nonce, unsigned uint8_t* out) {
+	for (unsigned i = 0; i < 8; i++) {
+		out[i] = static_cast<uint8_t>(nonce >> (8 * i));
 	}
-
-	out[0] = result + '0';
-	i = nonce_size;
-	out[i] = 0;
-	return i;
+	return 8;
 }
 
 
 extern __shared__ uint8_t threads_buffer[];
 __global__ void sha256_kernel(
-	uint8_t* out_input_string_nonce, uint8_t* out_found_hash,
+	uint8_t* out_nonce, uint8_t* out_found_hash,
 	int *out_found,
-	const uint8_t* prefix_in, size_t prefix_in_size,
-	uint8_t difficulty, uint64_t nonce_seed,
-	const * miner_id_in, const size_t miner_id_in_size
+	const SHA256_CTX* const hasher_prefix,
+	const uint8_t difficulty, const uint64_t nonce_seed,
+	const uint8_t* miner_id_in, const size_t miner_id_in_size
 ) {
 	// If this is the first thread of the block, init the input string in shared memory
-	uint8_t* const prefix = &threads_buffer[0];
-	uint8_t* const miner_id_in = &threads_buffer[static_cast<size_t>(std::ceil((prefix_in_size + 1) / 8.f) * 8)];
+	uint8_t* const miner_id_in = &threads_buffer[0];
 	if (threadIdx.x == 0) {
-		memcpy(prefix, prefix_in, prefix_in_size + 1);
 		memcpy(miner_id_in, miner_id_in, miner_id_in_size + 1);
 	}
 	__syncthreads(); // Ensure the strings have been written to SMEM
 
 	const uint64_t nonce = nonce_seed + (blockIdx.x * blockDim.x + threadIdx.x);
 
-	// The first byte we can write because there is the input string at the begining
+	// The first byte we can write because there is the miner_id string at the begining
 	// Respects the memory padding of 8 bit (uint8_t).
-	const size_t minthreads_buffer
-		= static_cast<size_t>(std::ceil((prefix_in_size + 1) / 8.f) * 8)
-		+ static_cast<size_t>(std::ceil((miner_id_in_size + 1) / 8.f) * 8);
+	const size_t min_threads_buffer = static_cast<size_t>(std::ceil((miner_id_in_size + 1) / 8.f) * 8);
 
-	const uintptr_t md_addr = threadIdx.x * (64) + minthreads_buffer;
+	const uintptr_t md_addr = threadIdx.x * (64) + min_threads_buffer;
 	const uintptr_t nonce_addr = md_addr + 32;
 
 	uint8_t* const md = &threads_buffer[md_addr];
 
-	uint8_t* const coin_blob = &threads_buffer[nonce_addr];
-	memset(coin_blob, 0, 32);
+	uint8_t* const nonce_bytes = &threads_buffer[nonce_addr];
+	memset(nonce_bytes, 0, 32);
 
-	uint8_t size = nonce_to_str(nonce, coin_blob);
+	uint8_t size = nonce_to_bytes(nonce, nonce_bytes);
 	assert(size <= 32);
 	{
-		SHA256_CTX ctx;
-		sha256_init(&ctx);
-		sha256_update(&ctx, prefix, prefix_in_size);
-		sha256_update(&ctx, coin_blob, size);
+		SHA256_CTX ctx = *hasher_prefix;
+		sha256_update(&ctx, nonce_bytes, size);
 		sha256_update(&ctx, miner_id_in, miner_id_in_size);
 		sha256_final(&ctx, md);
 	}
-
-	if (count_leading_zero_nibbles_(md, difficulty) >= difficulty && atomicExch(out_found, 1) == 0) {
+	if ((count_leading_zero_nibbles_(md, difficulty) >= difficulty) && (atomicExch(out_found, 1) == 0)) {
 		memcpy(out_found_hash, md, 32);
-		memcpy(out_input_string_nonce, prefix, prefix_in_size);
-		memcpy(out_input_string_nonce + prefix_in_size, coin_blob, size);
-		memcpy(out_input_string_nonce + prefix_in_size + size, miner_id_in, miner_id_in_size + 1);
+		memcpy(out_nonce, nonce_bytes, size);
 	}
 }
 
@@ -145,11 +126,6 @@ void print_state() {
 		t_last_updated = std::chrono::high_resolution_clock::now();
 		last_nonce_since_update = nonce;
 	}
-
-	if (*g_found) {
-		std::clog << g_out << std::endl;
-		print_hash(g_hash_out);
-	}
 }
 
 
@@ -165,19 +141,18 @@ int main(const int argc, char const *const argv[]) {
 	// num_threads (ignored)
 
 	const std::string prefix = std::string("CPEN 442 Coin2021") + last_coin;
+	SHA256_CTX hasher_prefix;
+	sha256_init(&hasher_prefix);
+	sha256_update(&hasher_prefix, prefix.c_str(), prefix.size());
 
 	std::clog << "Nonce : ";
 	std::cin >> user_nonce;
-
-	char* g_prefix_str = nullptr;
-	cudaMalloc(&g_prefix_str, prefix.size()+1);
-	cudaMemcpy(g_prefix_str, prefix.c_str(), prefix.size()+1, cudaMemcpyHostToDevice);
 
 	char* g_miner_id_str = nullptr;
 	cudaMalloc(&g_miner_id_str, arg_id_of_miner.size()+1);
 	cudaMemcpy(g_miner_id_str, arg_id_of_miner.c_str(), arg_id_of_miner.size()+1, cudaMemcpyHostToDevice);
 
-	cudaMallocManaged(&g_out, prefix.size() + 32 + arg_id_of_miner.size() + 1);
+	cudaMallocManaged(&g_nonce_out, 32 + arg_id_of_miner.size());
 	cudaMallocManaged(&g_hash_out, 32);
 	cudaMallocManaged(&g_found, sizeof(int));
 	*g_found = 0;
@@ -192,7 +167,7 @@ int main(const int argc, char const *const argv[]) {
 
 	while (!*g_found) {
 		sha256_kernel << < NUMBLOCKS, BLOCK_SIZE, dynamic_shared_size >> > (
-			g_out, g_hash_out, g_found, g_prefix_str, prefix.size(), difficulty, nonce, g_miner_id_str, arg_id_of_miner.size()
+			g_nonce_out, g_hash_out, g_found, &hasher_prefix, difficulty, nonce, g_miner_id_str, arg_id_of_miner.size()
 		);
 		cudaError_t err = cudaDeviceSynchronize();
 		if (err != cudaSuccess) {
@@ -201,11 +176,12 @@ int main(const int argc, char const *const argv[]) {
 		nonce += NUMBLOCKS * BLOCK_SIZE;
 		print_state();
 	}
+	print_hex_bytes(std::clog, g_nonce_out, 32 + arg_id_of_miner.size());
+	print_hex_bytes(std::cout, g_hash_out, 32);
 
-	cudaFree(g_out);
+	cudaFree(g_nonce_out);
 	cudaFree(g_hash_out);
 	cudaFree(g_found);
-	cudaFree(g_prefix_str);
 	cudaFree(g_miner_id_str);
 	cudaDeviceReset();
 	return 0;
