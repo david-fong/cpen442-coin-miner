@@ -70,17 +70,18 @@ __device__ uint8_t nonce_to_bytes(uint64_t nonce, uint8_t* out) {
 extern __shared__ uint8_t threads_buffer[];
 __global__ void sha256_kernel(
 	uint8_t* out_nonce, uint8_t* out_found_hash, int *out_found,
-	const char* const prefix_str, const usize_t prefix_str_size,
+	const unsigned char* const prefix_str, const size_t prefix_str_size,
 	const uint8_t difficulty, const uint64_t nonce_seed,
 	const char* miner_id_str // 32 bytes
 ) {
-	const SHA256_CTX* const hasher_prefix_sha = &threads_buffer[0];
+	SHA256_CTX* const hasher_prefix = (SHA256_CTX*)&threads_buffer[0];
 	uint8_t* const miner_id = &threads_buffer[sizeof(SHA256_CTX)];
 
 	// If this is the first thread of the block, init the constants in shared memory
 	if (threadIdx.x == 0) {
-		sha256_init(&hasher_prefix);
-		sha256_update(&hasher_prefix, prefix_str, prefix_str_size);
+		SHA256_CTX hasher = *hasher_prefix;
+		sha256_init(&hasher);
+		sha256_update(&hasher, prefix_str, prefix_str_size);
 		memcpy(miner_id, miner_id_str, 32);
 	}
 	__syncthreads(); // Ensure the constants have been written to SMEM
@@ -141,7 +142,7 @@ int main(const int argc, char const *const argv[]) {
 	// std::clog << "Nonce: ";
 	// std::cin >> user_nonce;
 
-	char* g_prefix_str = nullptr;
+	unsigned char* g_prefix_str = nullptr;
 	cudaMalloc(&g_prefix_str, prefix_str.size()+1);
 	cudaMemcpy(g_prefix_str, prefix_str.c_str(), prefix_str.size()+1, cudaMemcpyHostToDevice);
 
@@ -171,7 +172,7 @@ int main(const int argc, char const *const argv[]) {
 			g_nonce_out, g_hash_out, g_found,
 			g_prefix_str, prefix_str.size(),
 			difficulty, nonce,
-			g_id_of_miner, id_of_miner.size()
+			g_id_of_miner
 		);
 		cudaError_t err = cudaDeviceSynchronize();
 		if (err != cudaSuccess) {
