@@ -14,7 +14,7 @@
 #include <cstring>
 
 
-#define SHOW_INTERVAL_MS 10000
+#define SHOW_INTERVAL_MS 120000
 #define BLOCK_SIZE 256
 #define SHA_PER_ITERATIONS 8'388'608
 #define NUMBLOCKS (SHA_PER_ITERATIONS + BLOCK_SIZE - 1) / BLOCK_SIZE
@@ -40,7 +40,7 @@ void print_hex_bytes(std::ostream& os, const uint8_t* bytes, size_t bytes_size) 
 	for (uint8_t i = 0; i < bytes_size; ++i) {
 		os << std::setw(2) << static_cast<int>(bytes[i]);
 	}
-	os << std::dec << std::endl;
+	os << std::dec << std::flush;
 }
 
 
@@ -72,38 +72,37 @@ __global__ void sha256_kernel(
 	uint8_t* out_nonce, uint8_t* out_found_hash, int *out_found,
 	const unsigned char* const prefix_str, const size_t prefix_str_size,
 	const uint8_t difficulty, const uint64_t nonce_seed,
-	const char* miner_id_str // 32 bytes
+	const char* id_of_miner_str // 64 bytes
 ) {
 	SHA256_CTX* const hasher_prefix = (SHA256_CTX*)&threads_buffer[0];
-	uint8_t* const miner_id = &threads_buffer[sizeof(SHA256_CTX)];
+	uint8_t* const id_of_miner = &threads_buffer[sizeof(SHA256_CTX)];
 
 	// If this is the first thread of the block, init the constants in shared memory
 	if (threadIdx.x == 0) {
-		SHA256_CTX hasher = *hasher_prefix;
-		sha256_init(&hasher);
-		sha256_update(&hasher, prefix_str, prefix_str_size);
-		memcpy(miner_id, miner_id_str, 32);
+		sha256_init(hasher_prefix);
+		sha256_update(hasher_prefix, prefix_str, prefix_str_size);
+		memcpy(id_of_miner, id_of_miner_str, 64);
 	}
 	__syncthreads(); // Ensure the constants have been written to SMEM
 
 	// Respects the memory padding of 8 bit (uint8_t).
-	const size_t miner_threads_buffer = static_cast<size_t>(std::ceil((sizeof(SHA256_CTX) + 32 + 1) / 8.f) * 8);
-	const uintptr_t md_addr = threadIdx.x * (64) + miner_threads_buffer;
-	const uintptr_t nonce_addr = md_addr + 32;
+	const size_t miner_threads_buffer = static_cast<size_t>(std::ceil((sizeof(SHA256_CTX) + 64 + 1) / 8.f) * 8);
+	const size_t md_addr = threadIdx.x * (32+16) + miner_threads_buffer;
+	const size_t nonce_addr = md_addr + 32;
 
 	uint8_t* const md = &threads_buffer[md_addr];
 	uint8_t* const nonce = &threads_buffer[nonce_addr];
-	memset(nonce, 0, 32);
+	memset(nonce, 0, 16);
 	nonce_to_bytes(nonce_seed + (blockIdx.x * blockDim.x + threadIdx.x), nonce);
 	{
 		SHA256_CTX hasher = *hasher_prefix;
-		sha256_update(&hasher, nonce, 32);
-		sha256_update(&hasher, miner_id, 32);
+		sha256_update(&hasher, nonce, 16);
+		sha256_update(&hasher, id_of_miner, 64);
 		sha256_final(&hasher, md);
 	}
 	if ((count_leading_zero_nibbles_(md, difficulty) >= difficulty) && (atomicExch(out_found, 1) == 0)) {
 		memcpy(out_found_hash, md, 32);
-		memcpy(out_nonce, nonce, 32);
+		memcpy(out_nonce, nonce, 16);
 	}
 }
 
@@ -116,8 +115,8 @@ void print_state() {
 	if (last_show_interval.count() > SHOW_INTERVAL_MS) {
 		std::chrono::duration<double, std::milli> span = t2 - t_last_updated;
 		float ratio = span.count() / 1000;
-		std::clog << span.count() << " " << nonce - last_nonce_since_update << std::endl;
-		std::clog << std::fixed << static_cast<uint64_t>((nonce - last_nonce_since_update) / ratio) << " hashes/s" << std::endl;
+		// std::clog << span.count() << " " << nonce - last_nonce_since_update << std::endl;
+		std::clog << std::fixed << static_cast<uint64_t>((nonce - last_nonce_since_update) / ratio) << "hashes/s, ";
 		std::clog << std::fixed << "nonce: " << nonce << std::endl;
 
 		t_last_updated = std::chrono::high_resolution_clock::now();
@@ -132,7 +131,7 @@ int main(const int argc, char const *const argv[]) {
 	t_last_updated = std::chrono::high_resolution_clock::now();
 
 	const std::string id_of_miner(argv[1]);
-	std::string team_member_id(argv[2]); team_member_id.resize(8, '\0');
+	std::string team_member_id(argv[2]); team_member_id.resize(8, '\xff');
 	const std::string last_coin(argv[3]);
 	difficulty = std::stoi(argv[4]);
 	// num_threads (ignored)
@@ -150,7 +149,7 @@ int main(const int argc, char const *const argv[]) {
 	cudaMalloc(&g_id_of_miner, id_of_miner.size()+1);
 	cudaMemcpy(g_id_of_miner, id_of_miner.c_str(), id_of_miner.size()+1, cudaMemcpyHostToDevice);
 
-	cudaMallocManaged(&g_nonce_out, 32);
+	cudaMallocManaged(&g_nonce_out, 16);
 	cudaMallocManaged(&g_hash_out, 32);
 	cudaMallocManaged(&g_found, sizeof(int));
 	*g_found = 0;
@@ -160,11 +159,11 @@ int main(const int argc, char const *const argv[]) {
 
 	checkCudaErrors(cudaMemcpyToSymbol(dev_k, host_k, sizeof(host_k), 0, cudaMemcpyHostToDevice));
 
-	const size_t dynamic_shared_size = (
-		ceil((sizeof(SHA256_CTX)
-		+ 32 // id_of_miner
+	const size_t dynamic_shared_size = (std::ceil((
+		sizeof(SHA256_CTX)
+		+ 64 // id_of_miner
 		+ 1
-	) / 8.f) * 8) + (64 * BLOCK_SIZE);
+	) / 8.f) * 8) + ((32/*md*/+16/*nonce*/) * BLOCK_SIZE);
 	std::clog << "Shared memory is " << dynamic_shared_size / 1024 << "KB" << std::endl;
 
 	while (!*g_found) {
@@ -181,11 +180,14 @@ int main(const int argc, char const *const argv[]) {
 		nonce += NUMBLOCKS * BLOCK_SIZE;
 		print_state();
 	}
+	std::clog << "\n\nhash: ";
 	print_hex_bytes(std::clog, g_hash_out, 32);
+	std::clog << std::endl;
 
 	// coin_blob:
 	print_hex_bytes(std::cout, (const uint8_t*)team_member_id.data(), team_member_id.size());
-	print_hex_bytes(std::cout, g_nonce_out, 32);
+	print_hex_bytes(std::cout, g_nonce_out, 16);
+	std::cout.flush();
 
 	cudaFree(g_nonce_out);
 	cudaFree(g_hash_out);
