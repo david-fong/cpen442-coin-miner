@@ -1,4 +1,4 @@
-/** Copied from https://github.com/moffa13/SHA256CUDA */
+/** Copied from https://github.com/Horkyze/CudaSHA256 */
 #ifndef SHA256_H
 #define SHA256_H
 
